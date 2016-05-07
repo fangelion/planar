@@ -2,11 +2,11 @@
 // @id             iitc-plugin-planar@teo96
 // @name           IITC plugin: show list of links
 // @category       Info
-// @version        0.2.1.20160502.205329
+// @version        0.2.1.20160507.83856
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      none
 // @downloadURL    none
-// @description    [fangelion-2016-05-02-205329] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
+// @description    [fangelion-2016-05-07-083856] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
 // @match          https://www.ingress.com/intel*
@@ -17,7 +17,7 @@
 // @match          http://www.ingress.com/mission/*
 // @grant          none
 // ==/UserScript==
-"use strict";
+//"use strict";
 //jshint ignore:start
 
 function wrapper(plugin_info) {
@@ -27,7 +27,7 @@ if(typeof window.plugin !== 'function') window.plugin = function() {};
 //PLUGIN AUTHORS: writing a plugin outside of the IITC build environment? if so, delete these lines!!
 //(leaving them in place might break the 'About IITC' page or break update checks)
 plugin_info.buildName = 'fangelion';
-plugin_info.dateTimeVersion = '20160502.205329';
+plugin_info.dateTimeVersion = '20160507.83856';
 plugin_info.pluginId = 'planar';
 //END PLUGIN AUTHORS NOTE
 
@@ -39,7 +39,7 @@ plugin_info.pluginId = 'planar';
 window.plugin.planar = function() {};
 window.plugin.planar.listL = []; //основной список линков, с которым будем работать
 
-/*globals window, console, $, android, addHook, dialog, document*/
+/*globals window, console, $, android, addHook, dialog, document, localStorage*/
 /*exported setup, android, addHook*/
   /*
     нам необходимо: видеть портал источник, портал назначение, расстояние между ними (если больше определенного значения, то можно впилить калькулятор хватит или не хватит), количество ключей на портал (возможно список порталов с подсчетом ключей), посмотреть у жени эксель, кнопку для смены направления линка, номер линка (редактируемый?), кнопка проверки наличия кросов на линке, общая кнопка (проверка кросов более доскональная - посмотреть апи, плагины)
@@ -77,22 +77,56 @@ function getPortalLink (portal) {
 }
 
 window.plugin.planar.chLinkDirect = function (num) {
+  /*
+  Нужно менять еще и в массиве draw tools ---- болта!!! Не будет работать. 
+  Нужно либо переконвертировать в линии, либо отрываться от draw tools, либо дописывать новые линки в конец списка.
+  Возьмем первый вариант, как уже готовый, но последний более предпочтителен, хотя и более гемороен.
+  Первый не катит, из-за отсутствия привязки в структурах дравтулс. Сложно привязываться. Из дравтулс только пополнение.
+  */
+
   var buf;
   buf = window.plugin.planar.listL[num].start;
   window.plugin.planar.listL[num].start = window.plugin.planar.listL[num].end;
   window.plugin.planar.listL[num].end = buf;
 }
 
+
+function checkInList (latlng1, latlng2) {
+  /*проверяем наличие координат в списке линков
+  если присутствует линк, то false
+  если отсутствует то true
+  */
+  if (window.plugin.planar.listL.length > 0){
+    //console.log('ch listL', window.plugin.planar.listL);
+    var test = window.plugin.planar.listL.some( function(value, i) {
+      //console.log('forEach  ', value, i);
+      var start = [value.start.lat,value.start.lng].join(',');
+      var end = [value.end.lat,value.end.lng].join(',');
+      var latlngstart = latlng1.join(',');
+      var latlngend = latlng2.join(',');
+      if (((latlngstart == start) || (latlngstart == end)) && ((latlngend == start) || (latlngend == end))) {
+        console.log('link exists ', latlngstart, latlngend, " in list", start, end);
+        return true;
+      }
+      else {
+        console.log('link epsand ', latlngstart, latlngend);
+        return false;}
+    });
+    return !test;
+  }
+  else {
+  return true;}
+}
+
     function findBylatlngE6 (latlng) {
-      var latE6 = formatlatlngE6(latlng[0]);
-      var lngE6 = formatlatlngE6(latlng[1]);
       for(var guid in window.portals) {
         var data = window.portals[guid]._latlng;
         //console.log(data,[latE6, lngE6],window.portals[guid].options.data.title);
-        if(data.lat == latE6 && data.lng == lngE6) {
+        if(formatlatlngE6(data.lat) == latlng[0] && formatlatlngE6(data.lng) == latlng[1]) {
           window.plugin.bookmarks.switchStarPortal(guid);
-          //console.log(window.portals[guid]);
-          return getportalarr(window.portals[guid]);
+          var result = getportalarr(window.portals[guid]);
+          console.log(result);
+          return result;
         }
       }
       return undefined;
@@ -132,47 +166,62 @@ window.plugin.planar.chLinkDirect = function (num) {
 
     function getportalarr(portal) {
       var dic = {};
-      console.log(portal);
+      //console.log(portal);
       dic.guid = portal.options.guid;
       dic.title = portal.options.data.title;
-      dic.lat = portal._latlng.lat;
-      dic.lng = portal._latlng.lng;
+      dic.lat = formatlatlngE6(portal._latlng.lat);
+      dic.lng = formatlatlngE6(portal._latlng.lng);
+      return dic;
+    }
+
+    function getEmptyDic(latlng) {
+      var dic = {};
+      dic.guid = "empty";
+      dic.title = latlng.join(',');
+      dic.lat = latlng[0];
+      dic.lng = latlng[1];
       return dic;
     }
 
     function addLink(one, two) {
-      console.log(one,two);
-      var guid11 = findBylatlng(one);
-      var guid12 = findBylatlngE6(one);
-      var guid21 = findBylatlng(two);
-      var guid22 = findBylatlngE6(two);
-      var count = window.plugin.planar.listL.length;
-      window.plugin.planar.listL[count] = {};
-      //console.log('adding link', guid11, guid12, guid21, guid22);
-      if (guid11 !== undefined) {
-        //console.log(guid1,portal,window.portals[guid1]);
-        window.plugin.planar.listL[count].start = guid11;
+      //console.log(one,two);
+      one[0] = formatlatlngE6(one[0]);
+      one[1] = formatlatlngE6(one[1]);
+      two[0] = formatlatlngE6(two[0]);
+      two[1] = formatlatlngE6(two[1]);
+      var test = checkInList(one,two);
+      if (test){
+        console.log('new link',test, one, two);
+        var count = window.plugin.planar.listL.length;
+        window.plugin.planar.listL[count] = {};
+        var port1 = findBylatlng(one);
+        if (port1 === undefined) {
+          port1 = findBylatlngE6(one);
+          if (port1 === undefined){
+            window.plugin.planar.listL[count].start = getEmptyDic(one);
+          }
+          else {
+            window.plugin.planar.listL[count].start = port1;
+          }
+        }
+        else {
+          window.plugin.planar.listL[count].start = port1;
+        }
+        var port2 = findBylatlng(two);
+        if (port2 === undefined) {
+          port2 = findBylatlngE6(two);
+          if (port2 === undefined){
+            window.plugin.planar.listL[count].end = getEmptyDic(two);
+          }
+          else {
+            window.plugin.planar.listL[count].end = port2;
+          }
+        }
+        else {
+          window.plugin.planar.listL[count].end = port2;
+        }
+        window.plugin.planar.listL[count].num = count+1;
       }
-      else if (guid12 !== undefined) {
-        window.plugin.planar.listL[count].start = guid12;
-      }
-      else {
-        one[0] = formatlatlngE6(one[0]);
-        one[1] = formatlatlngE6(one[1]);
-        window.plugin.planar.listL[count].start = one.join(", ");
-      }
-      if (guid21 !== undefined) {
-        window.plugin.planar.listL[count].end = guid21;
-      }else if (guid22 !== undefined) {
-        window.plugin.planar.listL[count].end = guid22;
-      }
-      else {
-        two[0]=formatlatlngE6(two[0]);
-        two[1]=formatlatlngE6(two[1]);
-        window.plugin.planar.listL[count].end = two.join(", ");
-      }
-      console.log('in listL ',window.plugin.planar.listL[window.plugin.planar.listL.length-1]);
-      console.log('total ',window.plugin.planar.listL);
     }
 
 window.plugin.planar.fillLinks = function() {
@@ -194,7 +243,7 @@ window.plugin.planar.fillLinks = function() {
           latlngone = [dlistLinks[link].latLngs[0].lat,dlistLinks[link].latLngs[0].lng];
           latlngtwo = [dlistLinks[link].latLngs[1].lat,dlistLinks[link].latLngs[1].lng];
           addLink(latlngone,latlngtwo);
-          console.log('added line ',latlngone,latlngtwo);
+          //console.log('added line ',latlngone,latlngtwo);
           }
         else {
           if (dlistLinks[link].type === "polyline" && dlistLinks[link].latLngs.length > 2) {
@@ -202,7 +251,7 @@ window.plugin.planar.fillLinks = function() {
               latlngone = [dlistLinks[link].latLngs[i-1].lat,dlistLinks[link].latLngs[i-1].lng];
               latlngtwo = [dlistLinks[link].latLngs[i].lat,dlistLinks[link].latLngs[i].lng];
               addLink(latlngone,latlngtwo);
-              console.log('added polyline ',latlngone,latlngtwo);
+              //console.log('added polyline ',latlngone,latlngtwo);
               }
           //console.log(JSON.stringify(window.portals));
           }
@@ -214,14 +263,14 @@ window.plugin.planar.fillLinks = function() {
               addLink(latlngone,latlngtwo);
               addLink(latlngtwo,latlngthree);
               addLink(latlngone,latlngthree);
-              console.log('added polygon');
+              //console.log('added polygon');
               }
             }
           }
         }
       if (window.plugin.planar.listL.length > 0) {return true;}
       else {
-        console.log('nothing added', window.plugin.planar.listL);
+        //console.log('nothing added', window.plugin.planar.listL);
         return false;
       }
     }
@@ -233,35 +282,36 @@ window.plugin.planar.linksTable = function() {
   var container = $('<div>');
   table = document.createElement('table');
   table.className = 'lp';
-  
+  //window.plugin.planar.eventLoad();
   container.append(table);
-  console.log("build table ",window.plugin.planar.listL);
+  //console.log("build table ",window.plugin.planar.listL);
   window.plugin.planar.listL.forEach(function(link, i) {
     row = table.insertRow(-1);
     cell = row.insertCell(-1);
-    cell.appendChild(document.createTextNode(i+1));
-    if (typeof(link.start) == "string") {
-      cell = row.insertCell(-1);
-      cell.appendChild(document.createTextNode(link.start));
-    }
-    else if (Object.keys(link.start).length == 4) {
+    $(cell)
+      .text(link.num)
+      .addClass("num");
+
+    if (Object.keys(link.start).length == 4) {
       cell = row.insertCell(-1);
       cell.appendChild(getPortalLink(link.start));
       cell.className = "portalTitle";
     }
     cell = row.insertCell(-1);
-    $(cell).append('<a onclick="window.plugin.planar.chLinkDirect('+i+')" title="change link direction"> ==\> </a>');
-    $(cell).click(function(event) {
-      $("#planar").empty().append(window.plugin.planar.linksTable());
-      event.stopImmediatePropagation();
-      return false;
-    });
+    $(cell)
+      .text("==>")
+      .addClass("revlink")
+      //.title("change link direction");
+      .attr("idx", link.num);
+    /*$(cell)
+      .append('<a onclick="window.plugin.planar.chLinkDirect('+i+')" title="change link direction"> ==\> </a>')
+      .click(function(event) {
+        $("#planar").empty().append(window.plugin.planar.linksTable());
+        event.stopImmediatePropagation();
+        return false;
+      });*/
 
-    if (typeof(link.end) == "string") {
-      cell = row.insertCell(-1);
-      cell.appendChild(document.createTextNode(link.end));
-    }
-    else if (Object.keys(link.end).length == 4) {
+    if (Object.keys(link.end).length == 4) {
       cell = row.insertCell(-1);
       cell.appendChild(getPortalLink(link.end));
       cell.className = "portalTitle";
@@ -271,13 +321,40 @@ window.plugin.planar.linksTable = function() {
   return container;
 }
 
+window.plugin.planar.eventLoad = function() {
+  var plugin = $("#planar");
+  plugin
+    .find(".revlink")
+    .bind("click",function() {
+        console.log('click on link',$(this).attr("idx"));
+        window.plugin.planar.chLinkDirect($(this).attr("idx")-1);
+        plugin.empty().append(window.plugin.planar.linksTable());
+        //event.stopImmediatePropagation();
+        //return false;
+    });
+    //.trigger(".revlink")
+    //.unbind(".revlink");
+  /*plugin
+    .find(".num")
+    .click(function(event) {
+      $(this).empty()
+
+      window.plugin.planar.chNumLink();
+    });*/
+  console.log('end adding events');
+  return true;
+  
+}
+
 window.plugin.planar.displayPL = function() {
   //1 функция, которая стартует по нажатию кнопки. От нее и пляшем.
   var list;
-  window.plugin.planar.listL = [];
 
   if (window.plugin.planar.fillLinks()) {
+    
     list = window.plugin.planar.linksTable();
+    //console.log(list);
+
   } else {
     list = $('<table class="noPortals"><tr><td>Nothing to show!</td></tr></table>');
   }
@@ -293,6 +370,7 @@ window.plugin.planar.displayPL = function() {
       width: 700
     });
   }
+  window.plugin.planar.eventLoad();
 }
 
 window.plugin.planar.onPaneChanged = function(pane) {
@@ -312,7 +390,7 @@ var setup =  function() {
 
   $("<style>")
     .prop("type", "text/css")
-    .html("#plannar.mobile {\n  background: transparent;\n  border: 0 none !important;\n  height: 100% !important;\n  width: 100% !important;\n  left: 0 !important;\n  top: 0 !important;\n  position: absolute;\n  overflow: auto;\n}\n\n#plannar table {\n  margin-top: 5px;\n  border-collapse: collapse;\n  empty-cells: show;\n  width: 100%;\n  clear: both;\n}\n\n#plannar table td, #plannar table th {\n  background-color: #1b415e;\n  border-bottom: 1px solid #0b314e;\n  color: white;\n  padding: 3px;\n}\n\n#plannar table th {\n  text-align: center;\n}\n\n#plannar table .alignR {\n  text-align: right;\n}\n\n#plannar table.portals td {\n  white-space: nowrap;\n}\n\n#plannar table th.sortable {\n  cursor: pointer;\n}\n\n#plannar table .portalTitle {\n  min-width: 120px !important;\n  max-width: 240px !important;\n  overflow: hidden;\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  background-color: #017f01\n}\n\n#plannar .sorted {\n  color: #FFCE00;\n}\n\n#plannar table.filter {\n  table-layout: fixed;\n  cursor: pointer;\n  border-collapse: separate;\n  border-spacing: 1px;\n}\n\n#plannar table.filter th {\n  text-align: left;\n  padding-left: 0.3em;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n\n\n#plannar .disclaimer {\n  margin-top: 10px;\n  font-size: 10px;\n}\n\n#plannar.mobile table.filter tr {\n  display: block;\n  text-align: center;\n}\n#plannar.mobile table.filter th, #plannar.mobile table.filter td {\n  display: inline-block;\n  width: 22%;\n}\n\n")
+    .html("#plannar.mobile {\n  background: transparent;\n  border: 0 none !important;\n  height: 100% !important;\n  width: 100% !important;\n  left: 0 !important;\n  top: 0 !important;\n  position: absolute;\n  overflow: auto;\n}\n\n#plannar table {\n  margin-top: 5px;\n  /*border-collapse: collapse;*/\n  empty-cells: show;\n  width: 100%;\n  clear: both;\n  max-height: 90%;\n  \n}\n\n#plannar table td, #plannar table th {\n  /*background-color: #1b415e;*/\n  background-color: #017f01;\n  border-bottom: 1px solid #0b314e;\n  color: white;\n  padding: 3px;\n  border: 3px solid #060; /* Белая рамка */\n  border-radius: 5px; /* Радиус скругления */\n}\n\n#plannar table th {\n  text-align: center;\n}\n\n#plannar table .alignR {\n  text-align: right;\n}\n\n#plannar table.portals td {\n  white-space: nowrap;\n}\n\n#plannar table th.sortable {\n  cursor: pointer;\n}\n\n#plannar table .portalTitle {\n  min-width: 120px !important;\n  max-width: 240px !important;\n  overflow: hidden;\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  background-color: #017f01;\n}\n\n#plannar .sorted {\n  color: #FFCE00;\n}\n\n#plannar table.filter {\n  table-layout: fixed;\n  cursor: pointer;\n  border-collapse: separate;\n  border-spacing: 1px;\n}\n\n#plannar table.filter th {\n  text-align: left;\n  padding-left: 0.3em;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n\n\n#plannar .disclaimer {\n  margin-top: 10px;\n  font-size: 10px;\n}\n\n#plannar.mobile table.filter tr {\n  display: block;\n  text-align: center;\n}\n#plannar.mobile table.filter th, #plannar.mobile table.filter td {\n  display: inline-block;\n  width: 22%;\n}\n\n")
     .appendTo("head");
 
 }

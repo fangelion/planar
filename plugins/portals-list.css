@@ -11,17 +11,22 @@
 
 #plannar table {
   margin-top: 5px;
-  border-collapse: collapse;
+  /*border-collapse: collapse;*/
   empty-cells: show;
   width: 100%;
   clear: both;
+  max-height: 90%;
+  
 }
 
 #plannar table td, #plannar table th {
-  background-color: #1b415e;
+  /*background-color: #1b415e;*/
+  background-color: #017f01;
   border-bottom: 1px solid #0b314e;
   color: white;
   padding: 3px;
+  border: 3px solid #060; /* Белая рамка */
+  border-radius: 5px; /* Радиус скругления */
 }
 
 #plannar table th {
@@ -46,7 +51,7 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  background-color: #017f01
+  background-color: #017f01;
 }
 
 #plannar .sorted {
