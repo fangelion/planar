@@ -1,4 +1,4 @@
-#plannar.mobile {
+#planar.mobile {
   background: transparent;
   border: 0 none !important;
   height: 100% !important;
@@ -9,7 +9,7 @@
   overflow: auto;
 }
 
-#plannar table {
+#planar table {
   margin-top: 5px;
   /*border-collapse: collapse;*/
   empty-cells: show;
@@ -19,72 +19,94 @@
   
 }
 
-#plannar table td, #plannar table th {
+#planar table td, #planar table th {
   /*background-color: #1b415e;*/
   background-color: #017f01;
   border-bottom: 1px solid #0b314e;
   color: white;
   padding: 3px;
-  border: 3px solid #060; /* Белая рамка */
-  border-radius: 5px; /* Радиус скругления */
+  border: 3px solid #060; 
+  border-radius: 5px; 
 }
 
-#plannar table th {
+#planar table th {
   text-align: center;
 }
 
-#plannar table .alignR {
+#planar table .alignR {
   text-align: right;
 }
 
-#plannar table.portals td {
+#planar table.portals td {
   white-space: nowrap;
 }
 
-#plannar table th.sortable {
-  cursor: pointer;
+#planar table .num {
+  width: 7%;
+  color: #FFCE00;
 }
 
-#plannar table .portalTitle {
-  min-width: 120px !important;
-  max-width: 240px !important;
+#planar table .revlink {
+  width: 7%;
+  color: #FFCE00;
+}
+
+#planar table .portalstartend {
+  width: 35%;
+}
+
+#planar table .portalTitle {
+  width: 30%;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   background-color: #017f01;
 }
 
-#plannar .sorted {
-  color: #FFCE00;
+/*.menu_planar {
+  display:none;
+  cursor:pointer;
+  float:left;
+  width:220px;
+  background-color:#EEEEEE;
+  text-align:left;
+  position:absolute;
+  z-index:9999;
+  border: 3px solid #060;
+  border-radius: 5px;
+}
+*/
+.menu_planar {
+    display: none;
+    z-index: 1000;
+    position: absolute;
+    overflow: hidden;
+    border: 1px solid #CCC;
+    white-space: nowrap;
+    font-family: sans-serif;
+    background: #eee;
+    color: #333;
+    border-radius: 5px;
+    padding: 0;
 }
 
-#plannar table.filter {
-  table-layout: fixed;
-  cursor: pointer;
-  border-collapse: separate;
-  border-spacing: 1px;
+/* Each of the items in the list */
+.menu_planar li {
+    padding: 8px 12px;
+    cursor: pointer;
+    list-style-type: none;
+    transition: all .3s ease;
 }
 
-#plannar table.filter th {
-  text-align: left;
-  padding-left: 0.3em;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.menu_planar li:hover {
+    background-color: #DEF;
 }
 
-
-
-#plannar .disclaimer {
-  margin-top: 10px;
-  font-size: 10px;
-}
-
-#plannar.mobile table.filter tr {
-  display: block;
-  text-align: center;
-}
-#plannar.mobile table.filter th, #plannar.mobile table.filter td {
-  display: inline-block;
-  width: 22%;
-}
-
+/*#planar .menu_body li {
+  float:left;
+  position:relative;
+  margin:0 1px;
+  z-index:999;
+  width:150px;
+  background:#507EB9;
+}*/

@@ -51,15 +51,16 @@ settings = buildSettings[buildName]
 # set up vars used for replacements
 
 utcTime = time.gmtime()
-buildDate = time.strftime('%Y-%m-%d-%H%M%S',utcTime)
+buildDate = time.strftime('%Y-%m-%d-%H%M%S', utcTime)
 # userscripts have specific specifications for version numbers - the above date format doesn't match
-dateTimeVersion = time.strftime('%Y%m%d.',utcTime) + time.strftime('%H%M%S',utcTime).lstrip('0')
+# dateTimeVersion = time.strftime('%Y%m%d',utcTime) + time.strftime('%H%M%S',utcTime).lstrip('0')
+dateTimeVersion = str(int(time.strftime('%y%m%d', utcTime).lstrip('0')) + int(time.strftime('%H%M%S', utcTime).lstrip('0')))
 
 # extract required values from the settings entry
 resourceUrlBase = settings.get('resourceUrlBase')
 distUrlBase = settings.get('distUrlBase')
 buildMobile = settings.get('buildMobile')
-antOptions = settings.get('antOptions','')
+antOptions = settings.get('antOptions', '')
 antBuildFile = settings.get('antBuildFile', 'mobile/build.xml');
 
 

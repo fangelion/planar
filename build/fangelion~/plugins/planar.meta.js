@@ -1,12 +1,12 @@
 // ==UserScript==
-// @id             iitc-plugin-planar@teo96
+// @id             iitc-plugin-planar@fangelion
 // @name           IITC plugin: show list of links
 // @category       Info
-// @version        0.2.1.20160507.81828
+// @version        0.2.5.362318
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      none
 // @downloadURL    none
-// @description    [fangelion-2016-05-07-081828] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
+// @description    [fangelion-2016-06-15-201703] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
 // @match          https://www.ingress.com/intel*

@@ -1,12 +1,12 @@
 // ==UserScript==
-// @id             iitc-plugin-planar@teo96
+// @id             iitc-plugin-planar@fangelion
 // @name           IITC plugin: show list of links
 // @category       Info
-// @version        0.2.1.20160507.83856
+// @version        0.2.5.362454
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      none
 // @downloadURL    none
-// @description    [fangelion-2016-05-07-083856] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
+// @description    [fangelion-2016-06-15-201839] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
 // @match          https://www.ingress.com/intel*
@@ -27,7 +27,7 @@ if(typeof window.plugin !== 'function') window.plugin = function() {};
 //PLUGIN AUTHORS: writing a plugin outside of the IITC build environment? if so, delete these lines!!
 //(leaving them in place might break the 'About IITC' page or break update checks)
 plugin_info.buildName = 'fangelion';
-plugin_info.dateTimeVersion = '20160507.83856';
+plugin_info.dateTimeVersion = '362454';
 plugin_info.pluginId = 'planar';
 //END PLUGIN AUTHORS NOTE
 
@@ -37,7 +37,11 @@ plugin_info.pluginId = 'planar';
 // PLUGIN START ////////////////////////////////////////////////////////
 // use own namespace for plugin
 window.plugin.planar = function() {};
+window.plugin.planar.portalsL = {};
+/*Содержит список порталов и инфы по ним. Идентификаторами будут выступать guid порталов
+{"guid1":{title:"",lat:"",lng:""},"guid2":{title:"",lat:"",lng:""}}*/
 window.plugin.planar.listL = []; //основной список линков, с которым будем работать
+/*[{start:"guid",end:"guid"},{start:"guid",end:"guid"}]*/
 
 /*globals window, console, $, android, addHook, dialog, document, localStorage*/
 /*exported setup, android, addHook*/
@@ -47,20 +51,30 @@ window.plugin.planar.listL = []; //основной список линков, �
     информация по порталу - собирать всю постоянную информацию: название, координаты, guid, линк?
   */
 
-  /*[{start:[],end:[]},{start:[],end:[]},{start:[],end[]}] - не удобный вариант
+/*
+  TODO:
+*Реализовать запись адреса портала (см модуль чата)
+*Изменяем базу хранения линков и порталов (теперь их две)
+*Добавить количество ключей
+*Вычисление закрытых полей (как-то обозначать связаные линки)
+*Статистика полей/линков по экипажам (если порталы сгруппированы)
+*Добавить группировку порталов в списке порталов
+*/
 
-    [{start:{guid:"",lat:"",lng:"",title:""},end:{guid:"",lat:"",lng:"",title:""}},{start:{guid:"",lat:"",lng:"",title:""},end:{guid:"",lat:"",lng:"",title:""}},{start:{guid:"",lat:"",lng:"",title:""},end{guid:"",lat:"",lng:"",title:""}}]
+window.plugin.planar.setPortalsL = function(guid, title, lat, lng) {
+  window.plugin.planar.portalsL.push = {guid: guid, title: title, lat: lat, lng: lng};
+};
 
-    в итоге, нужен список для линков, словарь инфы о портале возвращается функцией, словарь порталов формируется непосредственно при создании записи о линке.
 
-  */
-
-function getPortalLink (portal) {
+function getPortalLink (guid) {
   //var coord = portal.getLatLng();
-  var perma = '/intel?ll='+portal.lat+','+portal.lng+'&z=17&pll='+portal.lat+','+portal.lng;
+  portal = window.plugin.planar.portalsL[guid];
+  //console.log('get portal link:', portal);
+  var perma = '/intel?ll='+portal.lat+','+portal.lng+'&z=15&pll='+portal.lat+','+portal.lng;
 
   // jQuery's event handlers seem to be removed when the nodes are remove from the DOM
   var link = document.createElement("a");
+
   link.textContent = portal.title;
   link.href = perma;
   link.addEventListener("click", function(ev) {
@@ -88,141 +102,215 @@ window.plugin.planar.chLinkDirect = function (num) {
   buf = window.plugin.planar.listL[num].start;
   window.plugin.planar.listL[num].start = window.plugin.planar.listL[num].end;
   window.plugin.planar.listL[num].end = buf;
+};
+
+
+window.plugin.planar.listInsert = function(idxfrom,idxto) {
+  if (idxfrom === idxto) {return true;}
+  window.plugin.planar.listL.splice(idxto,0,window.plugin.planar.listL[idxfrom]);
+  if (idxfrom > idxto) {
+    window.plugin.planar.listL.splice(idxfrom + 1,1);
+  }
+  else {
+    window.plugin.planar.listL.splice(idxfrom,1);
+    reBuildDT();
+  }
+  
+};
+
+window.plugin.planar.linkDelete = function(idx){
+  window.plugin.planar.listL.splice(idx,1);
+  reBuildDT();
+  window.plugin.planar.displayPL();
+};
+
+// Update the localStorage
+window.plugin.planar.saveStorage = function(key,data) {
+  localStorage[key] = JSON.stringify(data);
+};
+// Load the localStorage
+window.plugin.planar.loadStorage = function(key,data) {
+  data = JSON.parse(localStorage[key]);
+};
+
+function linksToText() {
+  var result = "";
+  window.plugin.planar.listL.forEach( function(link, i){
+    result += i + ". " + window.plugin.planar.portalsL[link.start].title + " --> " + window.plugin.planar.portalsL[link.end].title + "\n";
+  });
+  return result;
 }
 
+function portalsToText () {
+  var result = "";
+  var titles = [];
+  window.plugin.planar.listL.forEach( function(link, i){
+
+    if (!titles.includes(window.plugin.planar.portalsL[link.start].title)) {
+      result += window.plugin.planar.portalsL[link.start].title + "\n";
+      titles.append(window.plugin.planar.portalsL[link.start].title);
+    }
+    if (!titles.includes(window.plugin.planar.portalsL[link.end].title)) {
+      result += window.plugin.planar.portalsL[link.end].title + "\n";
+      titles.append(window.plugin.planar.portalsL[link.end].title);
+    }
+  });
+  return result;
+}
+
+function reBuildDT() {
+  //функция пересобирает базу ДТ из базы планара
+  //Нужна для того, чтобы упростить рисование 
+  var arr = [];
+  if (window.plugin.planar.listL.length === 0) {return false;}
+  window.plugin.planar.listL.forEach( function(link, i){
+    arr.push({
+      type:"polyline",
+      latLngs:[{lat:window.plugin.planar.portalsL[link.start].lat,lng:window.plugin.planar.portalsL[link.start].lng},{lat:window.plugin.planar.portalsL[link.end].lat,lng:window.plugin.planar.portalsL[link.end].lng}],
+      color:"#a24ac3"
+    });
+  });
+  try {
+    //var data = JSON.parse(resstr);
+    window.plugin.drawTools.drawnItems.clearLayers();
+    window.plugin.drawTools.import(arr);
+    console.log('Planar: reset and imported drawntools items');
+    window.plugin.drawTools.optAlert('Import Successful.');
+    window.plugin.drawTools.save();
+  }
+  catch(e){
+    console.warn('Planar: failed to import data: '+e);
+    window.plugin.drawTools.optAlert('<span style="color: #f88">Import failed</span>');
+  }
+}
 
 function checkInList (latlng1, latlng2) {
   /*проверяем наличие координат в списке линков
   если присутствует линк, то false
   если отсутствует то true
   */
+  function getGuid(latlng){
+    for (var i in window.plugin.planar.portalsL) {
+      if ((window.plugin.planar.portalsL[i].lat == latlng[0]) && (window.plugin.planar.portalsL[i].lng == latlng[1])) {
+        return i;
+      }
+    }
+    return false;
+  }
+  var guid1 = getGuid(latlng1);
+  var guid2 = getGuid(latlng2);
+  if (!((guid1) && (guid2))) {
+    return true;
+  }
   if (window.plugin.planar.listL.length > 0){
     //console.log('ch listL', window.plugin.planar.listL);
     var test = window.plugin.planar.listL.some( function(value, i) {
       //console.log('forEach  ', value, i);
-      var start = [value.start.lat,value.start.lng].join(',');
-      var end = [value.end.lat,value.end.lng].join(',');
-      var latlngstart = latlng1.join(',');
-      var latlngend = latlng2.join(',');
-      if (((latlngstart == start) || (latlngstart == end)) && ((latlngend == start) || (latlngend == end))) {
-        console.log('link exists ', latlngstart, latlngend, " in list", start, end);
+      var start = value.start;
+      var end = value.end;
+      if (((guid1 == start) || (guid1 == end)) && ((guid2 == start) || (guid2 == end))) {
+        //console.log('link exists ', latlngstart, latlngend, " in list", start, end);
         return true;
       }
       else {
-        console.log('link epsand ', latlngstart, latlngend);
+        //console.log('link epsand ', latlngstart, latlngend);
         return false;}
     });
     return !test;
   }
   else {
-  return true;}
+    return true;
+  }
 }
 
-    function findBylatlngE6 (latlng) {
-      for(var guid in window.portals) {
-        var data = window.portals[guid]._latlng;
-        //console.log(data,[latE6, lngE6],window.portals[guid].options.data.title);
-        if(formatlatlngE6(data.lat) == latlng[0] && formatlatlngE6(data.lng) == latlng[1]) {
-          window.plugin.bookmarks.switchStarPortal(guid);
-          var result = getportalarr(window.portals[guid]);
-          console.log(result);
-          return result;
-        }
-      }
-      return undefined;
+function formatToE6 (tst){
+  if (typeof(tst) != "string") {
+    tst = String(tst);
+  }
+  if (tst.indexOf(".") == "-1") {
+    while (tst.length < 9) {
+      tst = "0" + tst;
     }
-
-    function formatlatlngE6 (tst){
-      if (typeof(tst) != "string") {
-        tst = String(tst);
-      }
-      while (tst.length < 9) {
+    tst = tst.substring(0,3) + "." + tst.substring(3);
+    tst = String(parseFloat(tst));
+  }
+  else {
+    while (tst.length < 9) {
         tst = tst + "0";
       }
       if (tst.length > 9) {
         tst = tst.substr(0,9);
       }
-      return tst;
-    }
+  }
+  return tst;
+}
 
-    function findBylatlng (latlng) {
-      //функа поиска портала в списке по latlng
-      var listn = window.plugin.bookmarks.bkmrksObj.portals;
-      var dic = {};
-      for(var idFolders in listn) {
-        for(var idBkmrk in listn[idFolders].bkmrk) {
-          var portallatlng = listn[idFolders].bkmrk[idBkmrk].latlng;
-          if(latlng.join(",") === portallatlng) {
-            dic.guid = listn[idFolders].bkmrk[idBkmrk].guid;
-            dic.title = listn[idFolders].bkmrk[idBkmrk].label;
-            dic.lat = latlng[0];
-            dic.lng = latlng[1];
-            return dic;
-          }
-         }
+function addPortalToList (dic){
+  guid = dic.guid;
+  if (!(guid in window.plugin.planar.portalsL)){
+    window.plugin.planar.portalsL[guid] = dic;
+  }
+}
+
+function getByLatLng(latlng) {
+  //поиск в букмарках
+  var listn = window.plugin.bookmarks.bkmrksObj.portals;
+  var dic = {};
+  for(var idFolders in listn) {
+    for(var idBkmrk in listn[idFolders].bkmrk) {
+      var portallatlng = listn[idFolders].bkmrk[idBkmrk].latlng;
+      if(latlng.join(",") === portallatlng) {
+        dic.guid = listn[idFolders].bkmrk[idBkmrk].guid;
+        dic.title = listn[idFolders].bkmrk[idBkmrk].label;
+        dic.lat = latlng[0];
+        dic.lng = latlng[1];
+        console.log('added from bookmarks', dic.title);
+        return dic;
       }
-      return undefined;
     }
-
-    function getportalarr(portal) {
-      var dic = {};
-      //console.log(portal);
+  }
+  //поиск в списке порталов
+  for(var guid in window.portals) {
+    var data = window.portals[guid]._latlng;
+    //console.log(data,[latE6, lngE6],window.portals[guid].options.data.title);
+    if(formatToE6(data.lat) == latlng[0] && formatToE6(data.lng) == latlng[1]) {
+      window.plugin.bookmarks.switchStarPortal(guid);
+      var portal = window.portals[guid];
       dic.guid = portal.options.guid;
       dic.title = portal.options.data.title;
-      dic.lat = formatlatlngE6(portal._latlng.lat);
-      dic.lng = formatlatlngE6(portal._latlng.lng);
+      dic.lat = formatToE6(portal._latlng.lat);
+      dic.lng = formatToE6(portal._latlng.lng);
+      console.log('added from portals', dic.title, dic.lat, dic.lng);
       return dic;
     }
+  }
+  dic.guid = latlng.join(',');
+  dic.title = latlng.join(',');
+  dic.lat = latlng[0];
+  dic.lng = latlng[1];
+  return dic;
+}
 
-    function getEmptyDic(latlng) {
-      var dic = {};
-      dic.guid = "empty";
-      dic.title = latlng.join(',');
-      dic.lat = latlng[0];
-      dic.lng = latlng[1];
-      return dic;
-    }
-
-    function addLink(one, two) {
-      //console.log(one,two);
-      one[0] = formatlatlngE6(one[0]);
-      one[1] = formatlatlngE6(one[1]);
-      two[0] = formatlatlngE6(two[0]);
-      two[1] = formatlatlngE6(two[1]);
-      var test = checkInList(one,two);
-      if (test){
-        console.log('new link',test, one, two);
-        var count = window.plugin.planar.listL.length;
-        window.plugin.planar.listL[count] = {};
-        var port1 = findBylatlng(one);
-        if (port1 === undefined) {
-          port1 = findBylatlngE6(one);
-          if (port1 === undefined){
-            window.plugin.planar.listL[count].start = getEmptyDic(one);
-          }
-          else {
-            window.plugin.planar.listL[count].start = port1;
-          }
-        }
-        else {
-          window.plugin.planar.listL[count].start = port1;
-        }
-        var port2 = findBylatlng(two);
-        if (port2 === undefined) {
-          port2 = findBylatlngE6(two);
-          if (port2 === undefined){
-            window.plugin.planar.listL[count].end = getEmptyDic(two);
-          }
-          else {
-            window.plugin.planar.listL[count].end = port2;
-          }
-        }
-        else {
-          window.plugin.planar.listL[count].end = port2;
-        }
-        window.plugin.planar.listL[count].num = count+1;
-      }
-    }
+function addLink(one, two) {
+  //console.log(one,two);
+  one[0] = formatToE6(one[0]);
+  one[1] = formatToE6(one[1]);
+  two[0] = formatToE6(two[0]);
+  two[1] = formatToE6(two[1]);
+  var test = checkInList(one,two);
+  if (test){
+    //console.log('new link',test, one, two);
+    var count = window.plugin.planar.listL.length;
+    window.plugin.planar.listL[count] = {};
+    var port1 = getByLatLng(one);
+    addPortalToList(port1);
+    window.plugin.planar.listL[count].start = port1.guid;
+    var port2 = getByLatLng(two);
+    addPortalToList(port2);
+    window.plugin.planar.listL[count].end = port2.guid;
+    window.plugin.planar.listL[count].num = count + 1;
+  }
+}
 
 window.plugin.planar.fillLinks = function() {
       //нужно парсить список линков полученный из слоя draw tools и если это polyline, то находить координаты порталов в списке закладок после чего составлять список линков пользуясь именами порталов по координатам в букмарках
@@ -232,30 +320,22 @@ window.plugin.planar.fillLinks = function() {
         if (dlistLinks === undefined) return;
       }
       catch (e) {
-        console.warn('bookmarks: failed to load data from localStorage: '+e);                
+        console.warn('planar: failed to load data from localStorage: '+e);                
       }
       
       var latlngone, latlngtwo, latlngthree;
       console.log("starting parser");
       for (var link in dlistLinks) {
         //console.log(dlistLinks[link]["latLngs"]);
-        if (dlistLinks[link].type === "polyline" && dlistLinks[link].latLngs.length <= 2) {
-          latlngone = [dlistLinks[link].latLngs[0].lat,dlistLinks[link].latLngs[0].lng];
-          latlngtwo = [dlistLinks[link].latLngs[1].lat,dlistLinks[link].latLngs[1].lng];
-          addLink(latlngone,latlngtwo);
-          //console.log('added line ',latlngone,latlngtwo);
-          }
-        else {
-          if (dlistLinks[link].type === "polyline" && dlistLinks[link].latLngs.length > 2) {
-            for (var i=1; i<dlistLinks[link].latLngs.length; i++) {
+        if (dlistLinks[link].type === "polyline") {
+          for (var i=1; i<dlistLinks[link].latLngs.length; i++) {
               latlngone = [dlistLinks[link].latLngs[i-1].lat,dlistLinks[link].latLngs[i-1].lng];
               latlngtwo = [dlistLinks[link].latLngs[i].lat,dlistLinks[link].latLngs[i].lng];
               addLink(latlngone,latlngtwo);
               //console.log('added polyline ',latlngone,latlngtwo);
               }
-          //console.log(JSON.stringify(window.portals));
           }
-          else {
+        else {
             if (dlistLinks[link].type === "polygon") {
               latlngone = [dlistLinks[link].latLngs[0].lat,dlistLinks[link].latLngs[0].lng];
               latlngtwo = [dlistLinks[link].latLngs[1].lat,dlistLinks[link].latLngs[1].lng];
@@ -267,13 +347,12 @@ window.plugin.planar.fillLinks = function() {
               }
             }
           }
-        }
       if (window.plugin.planar.listL.length > 0) {return true;}
       else {
         //console.log('nothing added', window.plugin.planar.listL);
         return false;
       }
-    }
+    };
 
 
 window.plugin.planar.linksTable = function() {
@@ -284,67 +363,88 @@ window.plugin.planar.linksTable = function() {
   table.className = 'lp';
   //window.plugin.planar.eventLoad();
   container.append(table);
-  //console.log("build table ",window.plugin.planar.listL);
+  console.log("build table ");
   window.plugin.planar.listL.forEach(function(link, i) {
+    if (link.num-1 != i){
+      link.num = i+1;
+    }
     row = table.insertRow(-1);
+    var trow = $(row);
+    trow.addClass("rowPl");
+    trow.data("idx",i);
     cell = row.insertCell(-1);
     $(cell)
       .text(link.num)
-      .addClass("num");
+      .addClass("num")
+      .data('idx',link.num);
+    cell = row.insertCell(-1);
+    cell.appendChild(getPortalLink(link.start));
+    cell.className = "portalTitle";
 
-    if (Object.keys(link.start).length == 4) {
-      cell = row.insertCell(-1);
-      cell.appendChild(getPortalLink(link.start));
-      cell.className = "portalTitle";
-    }
     cell = row.insertCell(-1);
     $(cell)
       .text("==>")
       .addClass("revlink")
-      //.title("change link direction");
-      .attr("idx", link.num);
-    /*$(cell)
-      .append('<a onclick="window.plugin.planar.chLinkDirect('+i+')" title="change link direction"> ==\> </a>')
-      .click(function(event) {
-        $("#planar").empty().append(window.plugin.planar.linksTable());
-        event.stopImmediatePropagation();
-        return false;
-      });*/
-
-    if (Object.keys(link.end).length == 4) {
-      cell = row.insertCell(-1);
-      cell.appendChild(getPortalLink(link.end));
-      cell.className = "portalTitle";
-      
-    }
+      .data("idx", link.num);
+    cell = row.insertCell(-1);
+    cell.appendChild(getPortalLink(link.end));
+    cell.className = "portalTitle";
   });
   return container;
-}
+};
 
 window.plugin.planar.eventLoad = function() {
+  
   var plugin = $("#planar");
+  console.log('Start events');
   plugin
-    .find(".revlink")
-    .bind("click",function() {
-        console.log('click on link',$(this).attr("idx"));
-        window.plugin.planar.chLinkDirect($(this).attr("idx")-1);
+    .on("click",".revlink",function(event) {
+        console.log('click on link',$(this).data("idx"));
+        window.plugin.planar.chLinkDirect($(this).data("idx")-1);
         plugin.empty().append(window.plugin.planar.linksTable());
-        //event.stopImmediatePropagation();
-        //return false;
+        //plugin.trigger(".revlink");
     });
-    //.trigger(".revlink")
-    //.unbind(".revlink");
-  /*plugin
-    .find(".num")
-    .click(function(event) {
-      $(this).empty()
-
-      window.plugin.planar.chNumLink();
-    });*/
-  console.log('end adding events');
+    plugin.trigger("click");
+  console.log('second event start');
+  plugin
+    .on('click','.num', function(event) {
+      idx = $(this).text() - 1;
+      var menus = $("#planar").find(".menu_planar");
+        if (plugin.find('.menu_planar').length === 0){
+          $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
+          //$(this).append('<ul class="menu_planar"><li idx="' + idx + '""><window.plugin.planar.linkDelete('+idx+')Delete Link</li></ul>');
+          if (idx+1 == window.plugin.planar.listL.length){
+            $('.menu_planar',this).css("bottom", "1px");
+          } else {$('.menu_planar',this).css("bottom", "");}
+          $('.menu_planar',this).show('normal');
+        } else {
+          $('.menu_planar',this).hide('normal');
+          $('.menu_planar').remove();
+        }
+    });
+    plugin.trigger("click");
+    console.log('end adding events');
+  console.log("start draggable events");
+  var rowPl = plugin.find(".rowPl");
+  rowPl.draggable({
+    helper: "clone",
+     axis: "y"
+  });
+  var rowIndex = 0;
+  rowPl.droppable({
+    drop: function(event, ui){
+      console.log('droped', ui.draggable.context.rowIndex, event.target.rowIndex);
+      window.plugin.planar.listInsert (ui.draggable.context.rowIndex, event.target.rowIndex);
+      window.plugin.planar.displayPL();
+    },
+    over: function(ev, ui){ 
+      rowIndex = ui.draggable;
+      ui.draggable.css({backgroundColor: "#015801"});},
+    out: function(ev, ui){ ui.draggable.css({backgroundColor: "#017f01"});}
+  });
   return true;
   
-}
+};
 
 window.plugin.planar.displayPL = function() {
   //1 функция, которая стартует по нажатию кнопки. От нее и пляшем.
@@ -367,11 +467,15 @@ window.plugin.planar.displayPL = function() {
       dialogClass: 'ui-dialog-planar',
       title: 'Links list: ' + window.plugin.planar.listL.length + ' ' + (window.plugin.planar.listL.length == 1 ? 'link' : 'links'),
       id: 'planar-list',
-      width: 700
+      width: 700,
+      resizable: true,
+      buttons: {
+        "reload": function(e){ $("#planar").empty().append(window.plugin.planar.displayPL());},
+        "options": function(e){/*doing anything*/}}
     });
   }
   window.plugin.planar.eventLoad();
-}
+};
 
 window.plugin.planar.onPaneChanged = function(pane) {
   if(pane == "plugin-planar")
@@ -390,10 +494,10 @@ var setup =  function() {
 
   $("<style>")
     .prop("type", "text/css")
-    .html("#plannar.mobile {\n  background: transparent;\n  border: 0 none !important;\n  height: 100% !important;\n  width: 100% !important;\n  left: 0 !important;\n  top: 0 !important;\n  position: absolute;\n  overflow: auto;\n}\n\n#plannar table {\n  margin-top: 5px;\n  /*border-collapse: collapse;*/\n  empty-cells: show;\n  width: 100%;\n  clear: both;\n  max-height: 90%;\n  \n}\n\n#plannar table td, #plannar table th {\n  /*background-color: #1b415e;*/\n  background-color: #017f01;\n  border-bottom: 1px solid #0b314e;\n  color: white;\n  padding: 3px;\n  border: 3px solid #060; /* Белая рамка */\n  border-radius: 5px; /* Радиус скругления */\n}\n\n#plannar table th {\n  text-align: center;\n}\n\n#plannar table .alignR {\n  text-align: right;\n}\n\n#plannar table.portals td {\n  white-space: nowrap;\n}\n\n#plannar table th.sortable {\n  cursor: pointer;\n}\n\n#plannar table .portalTitle {\n  min-width: 120px !important;\n  max-width: 240px !important;\n  overflow: hidden;\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  background-color: #017f01;\n}\n\n#plannar .sorted {\n  color: #FFCE00;\n}\n\n#plannar table.filter {\n  table-layout: fixed;\n  cursor: pointer;\n  border-collapse: separate;\n  border-spacing: 1px;\n}\n\n#plannar table.filter th {\n  text-align: left;\n  padding-left: 0.3em;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n\n\n\n#plannar .disclaimer {\n  margin-top: 10px;\n  font-size: 10px;\n}\n\n#plannar.mobile table.filter tr {\n  display: block;\n  text-align: center;\n}\n#plannar.mobile table.filter th, #plannar.mobile table.filter td {\n  display: inline-block;\n  width: 22%;\n}\n\n")
+    .html("#planar.mobile {\n  background: transparent;\n  border: 0 none !important;\n  height: 100% !important;\n  width: 100% !important;\n  left: 0 !important;\n  top: 0 !important;\n  position: absolute;\n  overflow: auto;\n}\n\n#planar table {\n  margin-top: 5px;\n  /*border-collapse: collapse;*/\n  empty-cells: show;\n  width: 100%;\n  clear: both;\n  max-height: 90%;\n  \n}\n\n#planar table td, #planar table th {\n  /*background-color: #1b415e;*/\n  background-color: #017f01;\n  border-bottom: 1px solid #0b314e;\n  color: white;\n  padding: 3px;\n  border: 3px solid #060; \n  border-radius: 5px; \n}\n\n#planar table th {\n  text-align: center;\n}\n\n#planar table .alignR {\n  text-align: right;\n}\n\n#planar table.portals td {\n  white-space: nowrap;\n}\n\n#planar table .num {\n  width: 7%;\n  color: #FFCE00;\n}\n\n#planar table .revlink {\n  width: 7%;\n  color: #FFCE00;\n}\n\n#planar table .portalstartend {\n  width: 35%;\n}\n\n#planar table .portalTitle {\n  width: 30%;\n  overflow: hidden;\n  white-space: nowrap;\n  text-overflow: ellipsis;\n  background-color: #017f01;\n}\n\n/*.menu_planar {\n  display:none;\n  cursor:pointer;\n  float:left;\n  width:220px;\n  background-color:#EEEEEE;\n  text-align:left;\n  position:absolute;\n  z-index:9999;\n  border: 3px solid #060;\n  border-radius: 5px;\n}\n*/\n.menu_planar {\n    display: none;\n    z-index: 1000;\n    position: absolute;\n    overflow: hidden;\n    border: 1px solid #CCC;\n    white-space: nowrap;\n    font-family: sans-serif;\n    background: #eee;\n    color: #333;\n    border-radius: 5px;\n    padding: 0;\n}\n\n/* Each of the items in the list */\n.menu_planar li {\n    padding: 8px 12px;\n    cursor: pointer;\n    list-style-type: none;\n    transition: all .3s ease;\n}\n\n.menu_planar li:hover {\n    background-color: #DEF;\n}\n\n/*#planar .menu_body li {\n  float:left;\n  position:relative;\n  margin:0 1px;\n  z-index:999;\n  width:150px;\n  background:#507EB9;\n}*/\n")
     .appendTo("head");
 
-}
+};
 
 // PLUGIN END //////////////////////////////////////////////////////////
 // jshint ignore:start
