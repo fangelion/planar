@@ -25,11 +25,13 @@
 // PLUGIN START ////////////////////////////////////////////////////////
 // use own namespace for plugin
 window.plugin.planar = function() {};
+window.plugin.planar.tmpBkmrk = {};
 window.plugin.planar.portalsL = {};
+window.plugin.planar.dlistLinks = {};
 /*Содержит список порталов и инфы по ним. Идентификаторами будут выступать guid порталов
-{"guid1":{title:"",lat:"",lng:""},"guid2":{title:"",lat:"",lng:""}}*/
+{"guid1":{title:"",lat:"",lng:"",links:""},"guid2":{title:"",lat:"",lng:"",links:""}}*/
 window.plugin.planar.listL = []; //основной список линков, с которым будем работать
-/*[{start:"guid",end:"guid"},{start:"guid",end:"guid"}]*/
+/*[{start:"guid",end:"guid",num:"num"},{start:"guid",end:"guid",num:"num"}]*/
 
 /*globals window, console, $, android, addHook, dialog, document, localStorage*/
 /*exported setup, android, addHook*/
@@ -53,6 +55,143 @@ window.plugin.planar.setPortalsL = function(guid, title, lat, lng) {
   window.plugin.planar.portalsL.push = {guid: guid, title: title, lat: lat, lng: lng};
 };
 
+window.plugin.planar.countLincs = function(){
+  for (var link in window.plugin.planar.listL) {
+    link = window.plugin.planar.listL[link];
+    console.log(link);
+    window.plugin.planar.portalsL[link.start].links = window.plugin.planar.portalsL[link.start].links + 1;
+    window.plugin.planar.portalsL[link.end].links = window.plugin.planar.portalsL[link.end].links + 1;
+  }
+};
+
+//Добавить провеврку и чистку одинаковых линков.
+window.plugin.planar.checkSameFields = function(){
+  //проверка и чистка одинаковых полей (а нужно ли это?)
+  var numbers = [];
+  for (var i in window.plugin.planar.dlistLinks) {
+    latlngs = window.plugin.planar.dlistLinks[i].latlngs;
+    for (var j in latlngs){
+      txtlatlngs.push([latlngs[j].lat,latlngs[j].lng].join(";"));
+    }
+    for (var ii in window.plugin.planar.dlistLinks) {
+      latlngsTst = window.plugin.planar.dlistLinks[i].latlngs;
+      for (var jj in latlngs){
+        tstlatlngs.push([latlngsTst[j].lat,latlngsTst[j].lng].join(";"));
+      }
+      if (tstlatlngs.indexOf(txtlatlngs[0]) != -1 && tstlatlngs.indexOf(txtlatlngs[1]) != -1 && tstlatlngs.indexOf(txtlatlngs[2]) != -1 && i != ii) {
+        numbers.push(i);
+        console.log("Dublicate links", i, ii);
+      }
+    }
+  }
+};
+
+window.plugin.planar.checkSameLinks = function(){
+  //проверка и чистка одинаковых полей (а нужно ли это?)
+  var numbers = [];
+  
+  for (var i in window.plugin.planar.listL) {
+    var start = window.plugin.planar.listL[i].start;
+    var end = window.plugin.planar.listL[i].end;
+    for (var ii in window.plugin.planar.listL) {
+      var tst = [window.plugin.planar.listL[ii].start,window.plugin.planar.listL[ii].end];
+      if (tst.indexOf(start) != -1 && tst.indexOf(end) != -1 && i != ii) {
+        numbers.push(i);
+        console.log("Dublicate links", i, ii);
+        //window.plugin.planar.listL.pop(i);
+      }
+    }
+
+  }
+  for (var j in numbers) {
+    window.plugin.planar.listL.pop(numbers[j]);
+  }
+  //reBuildDT();
+};
+
+window.plugin.planar.showListPortals = function(){
+  var num = 1;
+  var res = "";
+  var line;
+  var arr = {};
+  var countFields = 0;
+  // {guid:[guid,guid,guid]}
+  window.plugin.planar.checkSameLinks();
+  window.plugin.planar.countLincs();
+
+  for (var guid in window.plugin.planar.portalsL){
+    line = [num,window.plugin.planar.portalsL[guid].title,window.plugin.planar.portalsL[guid].links].join(";");
+    res = res + line + "\n";
+    num = num + 1;
+  }
+
+  for (var link in window.plugin.planar.listL){
+    num = parseInt(link) + 1;
+    field = "";
+    link = window.plugin.planar.listL[link];
+    if (Object.keys(arr).indexOf(link.start) == -1) {
+      arr[link.start] = [];
+    }
+    if (Object.keys(arr).indexOf(link.end) == -1) {
+      arr[link.end] = [];
+    }
+    if (arr[link.start].indexOf(link.end) == -1) {
+      arr[link.start].push(link.end);
+    }
+    if (arr[link.end].indexOf(link.start) == -1) {
+      arr[link.end].push(link.start);
+    }
+    for (var tstportal in arr) {
+      if (arr[tstportal].indexOf(link.start) != -1 && arr[tstportal].indexOf(link.end) != -1) {
+        field = field + window.plugin.planar.portalsL[tstportal].title + "|";
+        countFields = countFields + 1;
+        //console.log("new field ", countFields);
+      }
+    }
+
+    line = [num,window.plugin.planar.portalsL[link.start].title,window.plugin.planar.portalsL[link.end].title,field,link.txtDistance,link.l6,link.l7,link.l8].join(";");
+    res = res + line + "\n";
+  }
+  res = res + "Total fields;"+ countFields;
+
+  dialog({
+        html: '<textarea cols="60" rows="1000" readonly>'+res+'</textarea>',
+        width: 400,
+        height: 400,
+        dialogClass: 'ui-dialog-planar-portals',
+        title: 'List of portals('+Object.keys(window.plugin.planar.portalsL).length+'); fields('+countFields+')'
+      });/*dialog({
+        html: '<div id="portals"></div>',
+        width: 700,
+        dialogClass: 'ui-dialog-planar-portals',
+        title: 'List of portals('+Object.keys(window.plugin.planar.portalsL).length+')'
+      });
+  var num = 1;
+  window.plugin.planar.countLincs();
+  var table, row, cell;
+  var container = $('#portals');//.find("#portals");
+  table = document.createElement('table');
+  table.className = 'lp';
+  //window.plugin.planar.eventLoad();
+  console.log("Starting draw portals list");
+  for (var guid in window.plugin.planar.portalsL){
+
+    row = table.insertRow(-1);
+    var trow = $(row);
+    trow.addClass("rowPl");
+    cell = row.insertCell(-1);
+    $(cell)
+      .text(num);
+    cell = row.insertCell(-1);
+    $(cell)
+      .append(getPortalLink(guid));
+    cell = row.insertCell(-1);
+    $(cell)
+      .text(window.plugin.planar.portalsL[guid].links);
+    num = num + 1;
+  }
+  container.append(table);*/
+};
 
 function getPortalLink (guid) {
   //var coord = portal.getLatLng();
@@ -92,6 +231,14 @@ window.plugin.planar.chLinkDirect = function (num) {
   window.plugin.planar.listL[num].end = buf;
 };
 
+window.plugin.planar.reReadPortal = function(id,tp){
+  tp = (tp === 0) ? "start" : "end";
+  var guid = window.plugin.planar.listL[id][tp];
+  latlng = [window.plugin.planar.portalsL[guid].lat,window.plugin.planar.portalsL[guid].lng];
+  dic = getByLatLng(latlng);
+  window.plugin.planar.portalsL[guid] = dic;
+  console.log(window.plugin.planar.tmpBkmrk);
+}; 
 
 window.plugin.planar.listInsert = function(idxfrom,idxto) {
   if (idxfrom === idxto) {return true;}
@@ -211,7 +358,7 @@ function checkInList (latlng1, latlng2) {
   }
 }
 
-function formatToE6 (tst){
+function formatToE6 (tst,flag){
   if (typeof(tst) != "string") {
     tst = String(tst);
   }
@@ -230,6 +377,11 @@ function formatToE6 (tst){
         tst = tst.substr(0,9);
       }
   }
+  if (flag == "bkmrk") {
+    while (tst[tst.length-1] == "0"){
+      tst.pop(tst.length-1);
+    }
+  }
   return tst;
 }
 
@@ -246,13 +398,15 @@ function getByLatLng(latlng) {
   var dic = {};
   for(var idFolders in listn) {
     for(var idBkmrk in listn[idFolders].bkmrk) {
-      var portallatlng = listn[idFolders].bkmrk[idBkmrk].latlng;
-      if(latlng.join(",") === portallatlng) {
+      var blatlng = listn[idFolders].bkmrk[idBkmrk].latlng.split(",");
+      if(latlng[0] === formatToE6(blatlng[0]) && latlng[1] === formatToE6(blatlng[1])) {
         dic.guid = listn[idFolders].bkmrk[idBkmrk].guid;
         dic.title = listn[idFolders].bkmrk[idBkmrk].label;
         dic.lat = latlng[0];
         dic.lng = latlng[1];
-        console.log('added from bookmarks', dic.title);
+        dic.links = 0;
+        console.log('added from bookmarks', dic.title, dic.lat, dic.lng);
+        window.plugin.planar.tmpBkmrk = listn[idFolders].bkmrk[idBkmrk];
         return dic;
       }
     }
@@ -268,14 +422,17 @@ function getByLatLng(latlng) {
       dic.title = portal.options.data.title;
       dic.lat = formatToE6(portal._latlng.lat);
       dic.lng = formatToE6(portal._latlng.lng);
+      dic.links = 0;
       console.log('added from portals', dic.title, dic.lat, dic.lng);
       return dic;
     }
   }
+  console.log("Empty portal", latlng);
   dic.guid = latlng.join(',');
   dic.title = latlng.join(',');
   dic.lat = latlng[0];
   dic.lng = latlng[1];
+  dic.links = 0;
   return dic;
 }
 
@@ -297,15 +454,24 @@ function addLink(one, two) {
     addPortalToList(port2);
     window.plugin.planar.listL[count].end = port2.guid;
     window.plugin.planar.listL[count].num = count + 1;
+    var distance = L.latLng(one).distanceTo(two);
+    var txtDistance = digits(distance > 10000 ? (distance/1000).toFixed(2) + "km" : (Math.round(distance) + "m"));
+    window.plugin.planar.listL[count].distance = distance;
+    window.plugin.planar.listL[count].txtDistance = txtDistance;
+    portalDistances = [2.560,12.96,40.96,100,207.36,384.16,655.36];
+    window.plugin.planar.listL[count].l6 = (distance > 207360) ? "softbank" : "";
+    window.plugin.planar.listL[count].l7 = (distance > 384160) ? "softbank" : "";
+    window.plugin.planar.listL[count].l8 = (distance > 655360) ? "softbank" : "";
+
   }
 }
 
 window.plugin.planar.fillLinks = function() {
       //нужно парсить список линков полученный из слоя draw tools и если это polyline, то находить координаты порталов в списке закладок после чего составлять список линков пользуясь именами порталов по координатам в букмарках
-      var dlistLinks;
+      //var window.plugin.planar.window.plugin.planar.dlistLinks;
       try {
-        dlistLinks = JSON.parse(localStorage['plugin-draw-tools-layer']);
-        if (dlistLinks === undefined) return;
+        window.plugin.planar.dlistLinks = JSON.parse(localStorage['plugin-draw-tools-layer']);
+        if (window.plugin.planar.dlistLinks === undefined) return;
       }
       catch (e) {
         console.warn('planar: failed to load data from localStorage: '+e);                
@@ -313,21 +479,21 @@ window.plugin.planar.fillLinks = function() {
       
       var latlngone, latlngtwo, latlngthree;
       console.log("starting parser");
-      for (var link in dlistLinks) {
-        //console.log(dlistLinks[link]["latLngs"]);
-        if (dlistLinks[link].type === "polyline") {
-          for (var i=1; i<dlistLinks[link].latLngs.length; i++) {
-              latlngone = [dlistLinks[link].latLngs[i-1].lat,dlistLinks[link].latLngs[i-1].lng];
-              latlngtwo = [dlistLinks[link].latLngs[i].lat,dlistLinks[link].latLngs[i].lng];
+      for (var link in window.plugin.planar.dlistLinks) {
+        //console.log(window.plugin.planar.dlistLinks[link]["latLngs"]);
+        if (window.plugin.planar.dlistLinks[link].type === "polyline") {
+          for (var i=1; i<window.plugin.planar.dlistLinks[link].latLngs.length; i++) {
+              latlngone = [window.plugin.planar.dlistLinks[link].latLngs[i-1].lat,window.plugin.planar.dlistLinks[link].latLngs[i-1].lng];
+              latlngtwo = [window.plugin.planar.dlistLinks[link].latLngs[i].lat,window.plugin.planar.dlistLinks[link].latLngs[i].lng];
               addLink(latlngone,latlngtwo);
               //console.log('added polyline ',latlngone,latlngtwo);
               }
           }
         else {
-            if (dlistLinks[link].type === "polygon") {
-              latlngone = [dlistLinks[link].latLngs[0].lat,dlistLinks[link].latLngs[0].lng];
-              latlngtwo = [dlistLinks[link].latLngs[1].lat,dlistLinks[link].latLngs[1].lng];
-              latlngthree = [dlistLinks[link].latLngs[2].lat,dlistLinks[link].latLngs[2].lng];
+            if (window.plugin.planar.dlistLinks[link].type === "polygon") {
+              latlngone = [window.plugin.planar.dlistLinks[link].latLngs[0].lat,window.plugin.planar.dlistLinks[link].latLngs[0].lng];
+              latlngtwo = [window.plugin.planar.dlistLinks[link].latLngs[1].lat,window.plugin.planar.dlistLinks[link].latLngs[1].lng];
+              latlngthree = [window.plugin.planar.dlistLinks[link].latLngs[2].lat,window.plugin.planar.dlistLinks[link].latLngs[2].lng];
               addLink(latlngone,latlngtwo);
               addLink(latlngtwo,latlngthree);
               addLink(latlngone,latlngthree);
@@ -399,7 +565,7 @@ window.plugin.planar.eventLoad = function() {
       idx = $(this).text() - 1;
       var menus = $("#planar").find(".menu_planar");
         if (plugin.find('.menu_planar').length === 0){
-          $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
+          $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.reReadPortal('+idx+',0)">Re read start portal</a></li><li><a onclick="window.plugin.planar.reReadPortal('+idx+',1)">Re read end portal</a></li><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
           //$(this).append('<ul class="menu_planar"><li idx="' + idx + '""><window.plugin.planar.linkDelete('+idx+')Delete Link</li></ul>');
           if (idx+1 == window.plugin.planar.listL.length){
             $('.menu_planar',this).css("bottom", "1px");
@@ -459,8 +625,17 @@ window.plugin.planar.displayPL = function() {
       resizable: true,
       buttons: {
         "reload": function(e){ $("#planar").empty().append(window.plugin.planar.displayPL());},
-        "options": function(e){/*doing anything*/}}
-    });
+        "options": function(e){/*doing anything*/
+          if ($("#planar").find('.menu_planar').length === 0){
+            $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.showListPortals()">Show portal list</a></li></ul>');
+            $('.menu_planar',this).css("bottom", "1px");
+            $('.menu_planar',this).show('normal');
+          } else {
+            $('.menu_planar',this).hide('normal');
+            $('.menu_planar').remove();
+          }
+    }}
+  });
   }
   window.plugin.planar.eventLoad();
 };
