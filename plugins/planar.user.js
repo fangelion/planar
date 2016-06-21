@@ -27,9 +27,10 @@
 window.plugin.planar = function() {};
 window.plugin.planar.tmpBkmrk = {};
 window.plugin.planar.portalsL = {};
+window.plugin.planar.parts = [];
 window.plugin.planar.dlistLinks = {};
 /*Содержит список порталов и инфы по ним. Идентификаторами будут выступать guid порталов
-{"guid1":{title:"",lat:"",lng:"",links:""},"guid2":{title:"",lat:"",lng:"",links:""}}*/
+{"guid1":{title:"",lat:"",lng:"",links:"",part:""},"guid2":{title:"",lat:"",lng:"",links:"",part:""}}*/
 window.plugin.planar.listL = []; //основной список линков, с которым будем работать
 /*[{start:"guid",end:"guid",num:"num"},{start:"guid",end:"guid",num:"num"}]*/
 
@@ -111,20 +112,32 @@ window.plugin.planar.checkSameLinks = function(){
 
 window.plugin.planar.showListPortals = function(){
   var num = 1;
-  var res = "";
+  var res = "Number;Portal Name;Total links on portal;Count outgoing links;Count incomink links\n";
   var line;
   var arr = {};
   var countFields = 0;
   // {guid:[guid,guid,guid]}
   window.plugin.planar.checkSameLinks();
   window.plugin.planar.countLincs();
-
-  for (var guid in window.plugin.planar.portalsL){
-    line = [num,window.plugin.planar.portalsL[guid].title,window.plugin.planar.portalsL[guid].links].join(";");
-    res = res + line + "\n";
-    num = num + 1;
+  for (var part in window.plugin.planar.parts) {
+    part = window.plugin.planar.parts[part];
+    res = res + ";" + part + "\n";
+    for (var guid in window.plugin.planar.portalsL){
+      if (window.plugin.planar.portalsL[guid].part == part) {
+        var cntIn = 0;
+        var cntOut = 0;
+        for (var lnk in window.plugin.planar.listL){
+          lnk = window.plugin.planar.listL[lnk];
+          if (lnk.start == guid) {cntOut = cntOut + 1;}
+          if (lnk.end == guid) {cntIn = cntIn + 1;}
+        }
+        line = [num,window.plugin.planar.portalsL[guid].title,window.plugin.planar.portalsL[guid].links,cntOut,cntIn].join(";");
+        res = res + line + "\n";
+        num = num + 1;
+      }
+    }
   }
-
+  res = res + "Number;Start portal;End portal;Field portal;Length link;L6;L7;L8\n";
   for (var link in window.plugin.planar.listL){
     num = parseInt(link) + 1;
     field = "";
@@ -143,7 +156,10 @@ window.plugin.planar.showListPortals = function(){
     }
     for (var tstportal in arr) {
       if (arr[tstportal].indexOf(link.start) != -1 && arr[tstportal].indexOf(link.end) != -1) {
-        field = field + window.plugin.planar.portalsL[tstportal].title + "|";
+        if (field !== ""){
+          field = field + " | ";
+        }
+        field = field + window.plugin.planar.portalsL[tstportal].title;
         countFields = countFields + 1;
         //console.log("new field ", countFields);
       }
@@ -293,6 +309,26 @@ function portalsToText () {
   return result;
 }
 
+window.plugin.planar.exportInDT = function(){
+  var arr = [];
+  if (window.plugin.planar.listL.length === 0) {return false;}
+  window.plugin.planar.listL.forEach( function(link, i){
+    arr.push({
+      type:"polyline",
+      latLngs:[{lat:window.plugin.planar.portalsL[link.start].lat,lng:window.plugin.planar.portalsL[link.start].lng},{lat:window.plugin.planar.portalsL[link.end].lat,lng:window.plugin.planar.portalsL[link.end].lng}],
+      color:"#a24ac3"
+    });
+  });
+  var res = JSON.stringify(arr);
+  dialog({
+        html: '<textarea cols="60" rows="1000" readonly>'+res+'</textarea>',
+        width: 400,
+        height: 400,
+        dialogClass: 'ui-dialog-planar-portals',
+        title: 'Export DT format'
+      });
+};
+
 function reBuildDT() {
   //функция пересобирает базу ДТ из базы планара
   //Нужна для того, чтобы упростить рисование 
@@ -405,6 +441,10 @@ function getByLatLng(latlng) {
         dic.lat = latlng[0];
         dic.lng = latlng[1];
         dic.links = 0;
+        dic.part = listn[idFolders].label;
+        if (window.plugin.planar.parts.indexOf(dic.part) == -1){
+          window.plugin.planar.parts.push(dic.part);
+        }
         console.log('added from bookmarks', dic.title, dic.lat, dic.lng);
         window.plugin.planar.tmpBkmrk = listn[idFolders].bkmrk[idBkmrk];
         return dic;
@@ -423,6 +463,10 @@ function getByLatLng(latlng) {
       dic.lat = formatToE6(portal._latlng.lat);
       dic.lng = formatToE6(portal._latlng.lng);
       dic.links = 0;
+      dic.part = "Other";
+      if (window.plugin.planar.parts.indexOf(dic.part) == -1){
+        window.plugin.planar.parts.push(dic.part);
+      }
       console.log('added from portals', dic.title, dic.lat, dic.lng);
       return dic;
     }
@@ -433,6 +477,10 @@ function getByLatLng(latlng) {
   dic.lat = latlng[0];
   dic.lng = latlng[1];
   dic.links = 0;
+  dic.part = "Empty";
+  if (window.plugin.planar.parts.indexOf(dic.part) == -1){
+    window.plugin.planar.parts.push(dic.part);
+  }
   return dic;
 }
 
@@ -563,17 +611,17 @@ window.plugin.planar.eventLoad = function() {
   plugin
     .on('click','.num', function(event) {
       idx = $(this).text() - 1;
-      var menus = $("#planar").find(".menu_planar");
-        if (plugin.find('.menu_planar').length === 0){
-          $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.reReadPortal('+idx+',0)">Re read start portal</a></li><li><a onclick="window.plugin.planar.reReadPortal('+idx+',1)">Re read end portal</a></li><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
-          //$(this).append('<ul class="menu_planar"><li idx="' + idx + '""><window.plugin.planar.linkDelete('+idx+')Delete Link</li></ul>');
+      var menus = $("#planar").find("#menu_planar");
+        if (plugin.find('#menu_planar').length === 0){
+          $(this).append('<ul id="menu_planar"><li><a onclick="window.plugin.planar.reReadPortal('+idx+',0)">Re read start portal</a></li><li><a onclick="window.plugin.planar.reReadPortal('+idx+',1)">Re read end portal</a></li><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
+          //$(this).append('<ul class=#menu_planar"><li idx="' + idx + '""><window.plugin.planar.linkDelete('+idx+')Delete Link</li></ul>');
           if (idx+1 == window.plugin.planar.listL.length){
-            $('.menu_planar',this).css("bottom", "1px");
-          } else {$('.menu_planar',this).css("bottom", "");}
-          $('.menu_planar',this).show('normal');
+            $('#menu_planar').css("bottom", "1px");
+          } else {$('#menu_planar').css("bottom", "");}
+          $('#menu_planar').show();
         } else {
-          $('.menu_planar',this).hide('normal');
-          $('.menu_planar').remove();
+          $('#menu_planar').hide();
+          $('#menu_planar').remove();
         }
     });
     plugin.trigger("click");
@@ -605,7 +653,7 @@ window.plugin.planar.displayPL = function() {
   var list;
 
   if (window.plugin.planar.fillLinks()) {
-    
+    window.plugin.planar.checkSameLinks();
     list = window.plugin.planar.linksTable();
     //console.log(list);
 
@@ -627,13 +675,13 @@ window.plugin.planar.displayPL = function() {
         "reload": function(e){ $("#planar").empty().append(window.plugin.planar.displayPL());},
         "options": function(e){/*doing anything*/
           if ($("#planar").find('.menu_planar').length === 0){
-            $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.showListPortals()">Show portal list</a></li></ul>');
+            $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.showListPortals()">Show portal list</a></li><li><a onclick="window.plugin.planar.exportInDT()">Export DT</a></li></ul>');
             $('.menu_planar',this).css("bottom", "1px");
             $('.menu_planar',this).show('normal');
           } else {
             $('.menu_planar',this).hide('normal');
             $('.menu_planar').remove();
-          }
+}
     }}
   });
   }
