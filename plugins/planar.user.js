@@ -633,9 +633,20 @@ window.plugin.planar.eventLoad = function() {
         if (plugin.find('.menu_planar').length === 0){
           $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.reReadPortal('+idx+',0)">Re read start portal</a></li><li><a onclick="window.plugin.planar.reReadPortal('+idx+',1)">Re read end portal</a></li><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
           //$(this).append('<ul class="menu_planar"><li idx="' + idx + '""><window.plugin.planar.linkDelete('+idx+')Delete Link</li></ul>');
-          if (idx+1 == window.plugin.planar.listL.length){
+          if (idx+1 >= window.plugin.planar.listL.length-4){
             $('.menu_planar',this).css("bottom", "1px");
-          } else {$('.menu_planar',this).css("bottom", "");}
+            
+          } else {$('.menu_planar',this).css("bottom", "");
+              var pos = $(this).offset();
+              var elem_left = pos.left;
+              var elem_top = pos.top;
+              // положение курсора внутри элемента
+              var Xinner = e.pageX - elem_left;
+              var Yinner = e.pageY - elem_top;
+              $('.menu_planar',this).css("position", "absolute");
+              $('.menu_planar',this).css("left", Xinner);
+              $('.menu_planar',this).css("top", Yinner);
+            }
           $('.menu_planar',this).show('normal');
         } else {
           $('.menu_planar',this).hide('normal');
