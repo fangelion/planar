@@ -30,7 +30,7 @@ window.plugin.planar.portalsL = {};
 window.plugin.planar.parts = [];
 window.plugin.planar.dlistLinks = {};
 /*Содержит список порталов и инфы по ним. Идентификаторами будут выступать guid порталов
-{"guid1":{title:"",lat:"",lng:"",links:"",part:""},"guid2":{title:"",lat:"",lng:"",links:"",part:""}}*/
+{"guid1":{title:"",lat:"",lng:"",links:"",part:"",link:"http://"},"guid2":{title:"",lat:"",lng:"",links:"",part:""}}*/
 window.plugin.planar.listL = []; //основной список линков, с которым будем работать
 /*[{start:"guid",end:"guid",num:"num"},{start:"guid",end:"guid",num:"num"}]*/
 
@@ -45,11 +45,12 @@ window.plugin.planar.listL = []; //основной список линков, �
 /*
   TODO:
 *Реализовать запись адреса портала (см модуль чата)
-*Изменяем базу хранения линков и порталов (теперь их две)
+*+Изменяем базу хранения линков и порталов (теперь их две)
 *Добавить количество ключей
 *Вычисление закрытых полей (как-то обозначать связаные линки)
 *Статистика полей/линков по экипажам (если порталы сгруппированы)
-*Добавить группировку порталов в списке порталов
+*+Добавить группировку порталов в списке порталов. #Группировка в букмаркетах, вывод группируется согласно папкам.
+*Добавить импорт порталов по списку линков на них
 */
 
 window.plugin.planar.setPortalsL = function(guid, title, lat, lng) {
@@ -57,9 +58,19 @@ window.plugin.planar.setPortalsL = function(guid, title, lat, lng) {
 };
 
 window.plugin.planar.countLincs = function(){
+  var tstarr = [];
   for (var link in window.plugin.planar.listL) {
     link = window.plugin.planar.listL[link];
-    console.log(link);
+    //console.log(link);
+    if (tstarr.indexOf(link.start) == -1) {
+      window.plugin.planar.portalsL[link.start].links = 0;
+      tstarr.push(link.start);
+      //console.log('zeroing')
+    }
+    if (tstarr.indexOf(link.end) == -1) {
+      window.plugin.planar.portalsL[link.end].links = 0;
+      tstarr.push(link.end);
+    }
     window.plugin.planar.portalsL[link.start].links = window.plugin.planar.portalsL[link.start].links + 1;
     window.plugin.planar.portalsL[link.end].links = window.plugin.planar.portalsL[link.end].links + 1;
   }
@@ -112,7 +123,7 @@ window.plugin.planar.checkSameLinks = function(){
 
 window.plugin.planar.showListPortals = function(){
   var num = 1;
-  var res = "Number;Portal Name;Total links on portal;Count outgoing links;Count incomink links\n";
+  var res = "Number;Portal Name;URL of portal;Total links on portal;Count outgoing links;Count incomink links\n";
   var line;
   var arr = {};
   var countFields = 0;
@@ -131,7 +142,7 @@ window.plugin.planar.showListPortals = function(){
           if (lnk.start == guid) {cntOut = cntOut + 1;}
           if (lnk.end == guid) {cntIn = cntIn + 1;}
         }
-        line = [num,window.plugin.planar.portalsL[guid].title,window.plugin.planar.portalsL[guid].links,cntOut,cntIn].join(";");
+        line = [num,window.plugin.planar.portalsL[guid].title,window.plugin.planar.createPortalLink(guid),window.plugin.planar.portalsL[guid].links,cntOut,cntIn].join(";");
         res = res + line + "\n";
         num = num + 1;
       }
@@ -207,6 +218,13 @@ window.plugin.planar.showListPortals = function(){
     num = num + 1;
   }
   container.append(table);*/
+};
+
+window.plugin.planar.createPortalLink = function(guid) {
+  portal = window.plugin.planar.portalsL[guid];
+  //console.log('get portal link:', portal);
+  var perma = 'https://www.ingress.com/intel?ll='+portal.lat+','+portal.lng+'&z=15&pll='+portal.lat+','+portal.lng;
+  return perma;
 };
 
 function getPortalLink (guid) {
@@ -611,17 +629,17 @@ window.plugin.planar.eventLoad = function() {
   plugin
     .on('click','.num', function(event) {
       idx = $(this).text() - 1;
-      var menus = $("#planar").find("#menu_planar");
-        if (plugin.find('#menu_planar').length === 0){
-          $(this).append('<ul id="menu_planar"><li><a onclick="window.plugin.planar.reReadPortal('+idx+',0)">Re read start portal</a></li><li><a onclick="window.plugin.planar.reReadPortal('+idx+',1)">Re read end portal</a></li><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
-          //$(this).append('<ul class=#menu_planar"><li idx="' + idx + '""><window.plugin.planar.linkDelete('+idx+')Delete Link</li></ul>');
+      var menus = $("#planar").find(".menu_planar");
+        if (plugin.find('.menu_planar').length === 0){
+          $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.reReadPortal('+idx+',0)">Re read start portal</a></li><li><a onclick="window.plugin.planar.reReadPortal('+idx+',1)">Re read end portal</a></li><li><a onclick="window.plugin.planar.linkDelete('+idx+')">Delete Link</a></li></ul>');
+          //$(this).append('<ul class="menu_planar"><li idx="' + idx + '""><window.plugin.planar.linkDelete('+idx+')Delete Link</li></ul>');
           if (idx+1 == window.plugin.planar.listL.length){
-            $('#menu_planar').css("bottom", "1px");
-          } else {$('#menu_planar').css("bottom", "");}
-          $('#menu_planar').show();
+            $('.menu_planar',this).css("bottom", "1px");
+          } else {$('.menu_planar',this).css("bottom", "");}
+          $('.menu_planar',this).show('normal');
         } else {
-          $('#menu_planar').hide();
-          $('#menu_planar').remove();
+          $('.menu_planar',this).hide('normal');
+$('.menu_planar').remove();
         }
     });
     plugin.trigger("click");
@@ -673,7 +691,9 @@ window.plugin.planar.displayPL = function() {
       resizable: true,
       buttons: {
         "reload": function(e){ $("#planar").empty().append(window.plugin.planar.displayPL());},
-        "options": function(e){/*doing anything*/
+        "Show portal list": function(e){ window.plugin.planar.showListPortals();},
+        "Export DT": function(e){ window.plugin.planar.exportInDT();}
+        /*"options": function(e){/*doing anything
           if ($("#planar").find('.menu_planar').length === 0){
             $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.showListPortals()">Show portal list</a></li><li><a onclick="window.plugin.planar.exportInDT()">Export DT</a></li></ul>');
             $('.menu_planar',this).css("bottom", "1px");
@@ -681,8 +701,8 @@ window.plugin.planar.displayPL = function() {
           } else {
             $('.menu_planar',this).hide('normal');
             $('.menu_planar').remove();
-}
-    }}
+          }
+    }*/}
   });
   }
   window.plugin.planar.eventLoad();
