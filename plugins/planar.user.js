@@ -28,6 +28,7 @@ window.plugin.planar = function() {};
 window.plugin.planar.tmpBkmrk = {};
 window.plugin.planar.portalsL = {};
 window.plugin.planar.parts = [];
+arr = {};
 window.plugin.planar.dlistLinks = {};
 /*Содержит список порталов и инфы по ним. Идентификаторами будут выступать guid порталов
 {"guid1":{title:"",lat:"",lng:"",links:"",part:"",link:"http://"},"guid2":{title:"",lat:"",lng:"",links:"",part:""}}*/
@@ -121,13 +122,35 @@ window.plugin.planar.checkSameLinks = function(){
   //reBuildDT();
 };
 
+window.plugin.planar.checkField = function(link, a) {
+  function addEndLinkInGuid(startGuid, endGuid) {
+    if (Object.keys(arr).indexOf(startGuid) == -1) {
+      arr[startGuid] = [];
+    }
+    if (arr[startGuid].indexOf(endGuid) == -1) {
+      arr[startGuid].push(endGuid);
+    }
+  }
+  result = [];
+  addEndLinkInGuid(link.start, link.end);
+  addEndLinkInGuid(link.end, link.start);
+  for (var guid in arr) {
+    if (arr[guid].indexOf(link.start) != -1 && arr[guid].indexOf(link.end) != -1) {
+      //console.log(link);
+      result.push(a ? window.plugin.planar.getPortalLink(guid) : window.plugin.planar.portalsL[guid].title);
+      window.countFields++;
+    }
+  }
+  return a ? result : result.join("|");
+};
+
 window.plugin.planar.showListPortals = function(){
   var num = 1;
   var res = "Number;Portal Name;URL of portal;Total links on portal;Count outgoing links;Count incomink links\n";
   var line;
-  var arr = {};
-  var countFields = 0;
-  // {guid:[guid,guid,guid]}
+  arr = {};
+  window.countFields = 0;
+  // {guid:[guid,guid,guid,guid]} хранит все конечные guid каждого портала 
   window.plugin.planar.checkSameLinks();
   window.plugin.planar.countLincs();
   for (var part in window.plugin.planar.parts) {
@@ -139,8 +162,8 @@ window.plugin.planar.showListPortals = function(){
         var cntOut = 0;
         for (var lnk in window.plugin.planar.listL){
           lnk = window.plugin.planar.listL[lnk];
-          if (lnk.start == guid) {cntOut = cntOut + 1;}
-          if (lnk.end == guid) {cntIn = cntIn + 1;}
+          if (lnk.start == guid) {cntOut++;}
+          if (lnk.end == guid) {cntIn++;}
         }
         line = [num,window.plugin.planar.portalsL[guid].title,window.plugin.planar.createPortalLink(guid),window.plugin.planar.portalsL[guid].links,cntOut,cntIn].join(";");
         res = res + line + "\n";
@@ -150,43 +173,18 @@ window.plugin.planar.showListPortals = function(){
   }
   res = res + "Number;Start portal;End portal;Field portal;Length link;L6;L7;L8\n";
   for (var link in window.plugin.planar.listL){
-    num = parseInt(link) + 1;
-    field = "";
     link = window.plugin.planar.listL[link];
-    if (Object.keys(arr).indexOf(link.start) == -1) {
-      arr[link.start] = [];
-    }
-    if (Object.keys(arr).indexOf(link.end) == -1) {
-      arr[link.end] = [];
-    }
-    if (arr[link.start].indexOf(link.end) == -1) {
-      arr[link.start].push(link.end);
-    }
-    if (arr[link.end].indexOf(link.start) == -1) {
-      arr[link.end].push(link.start);
-    }
-    for (var tstportal in arr) {
-      if (arr[tstportal].indexOf(link.start) != -1 && arr[tstportal].indexOf(link.end) != -1) {
-        if (field !== ""){
-          field = field + " | ";
-        }
-        field = field + window.plugin.planar.portalsL[tstportal].title;
-        countFields = countFields + 1;
-        //console.log("new field ", countFields);
-      }
-    }
-
-    line = [num,window.plugin.planar.portalsL[link.start].title,window.plugin.planar.portalsL[link.end].title,field,link.txtDistance,link.l6,link.l7,link.l8].join(";");
+    line = [num,window.plugin.planar.portalsL[link.start].title,window.plugin.planar.portalsL[link.end].title,window.plugin.planar.checkField(link,false),link.txtDistance,link.l6,link.l7,link.l8].join(";");
     res = res + line + "\n";
   }
-  res = res + "Total fields;"+ countFields;
+  res = res + "Total fields;"+ window.countFields;
 
   dialog({
         html: '<textarea cols="60" rows="1000" readonly>'+res+'</textarea>',
-        width: 400,
+        width: 420,
         height: 400,
         dialogClass: 'ui-dialog-planar-portals',
-        title: 'List of portals('+Object.keys(window.plugin.planar.portalsL).length+'); fields('+countFields+')'
+        title: 'List of portals('+Object.keys(window.plugin.planar.portalsL).length+'); fields('+window.countFields+')'
       });/*dialog({
         html: '<div id="portals"></div>',
         width: 700,
@@ -227,7 +225,7 @@ window.plugin.planar.createPortalLink = function(guid) {
   return perma;
 };
 
-function getPortalLink (guid) {
+window.plugin.planar.getPortalLink = function (guid) {
   //var coord = portal.getLatLng();
   portal = window.plugin.planar.portalsL[guid];
   //console.log('get portal link:', portal);
@@ -249,7 +247,7 @@ function getPortalLink (guid) {
     return false;
   });
   return link;
-}
+};
 
 window.plugin.planar.chLinkDirect = function (num) {
   /*
@@ -340,7 +338,7 @@ window.plugin.planar.exportInDT = function(){
   var res = JSON.stringify(arr);
   dialog({
         html: '<textarea cols="60" rows="1000" readonly>'+res+'</textarea>',
-        width: 400,
+        width: 420,
         height: 400,
         dialogClass: 'ui-dialog-planar-portals',
         title: 'Export DT format'
@@ -463,7 +461,7 @@ function getByLatLng(latlng) {
         if (window.plugin.planar.parts.indexOf(dic.part) == -1){
           window.plugin.planar.parts.push(dic.part);
         }
-        console.log('added from bookmarks', dic.title, dic.lat, dic.lng);
+        //console.log('added from bookmarks', dic.title, dic.lat, dic.lng);
         window.plugin.planar.tmpBkmrk = listn[idFolders].bkmrk[idBkmrk];
         return dic;
       }
@@ -485,7 +483,7 @@ function getByLatLng(latlng) {
       if (window.plugin.planar.parts.indexOf(dic.part) == -1){
         window.plugin.planar.parts.push(dic.part);
       }
-      console.log('added from portals', dic.title, dic.lat, dic.lng);
+      //console.log('added from portals', dic.title, dic.lat, dic.lng);
       return dic;
     }
   }
@@ -579,6 +577,8 @@ window.plugin.planar.linksTable = function() {
   //создаем таблицу для вывода списка линков
   var table, row, cell;
   var container = $('<div>');
+  arr = {};
+  window.countFields = 0;
   table = document.createElement('table');
   table.className = 'lp';
   //window.plugin.planar.eventLoad();
@@ -598,7 +598,7 @@ window.plugin.planar.linksTable = function() {
       .addClass("num")
       .data('idx',link.num);
     cell = row.insertCell(-1);
-    cell.appendChild(getPortalLink(link.start));
+    cell.appendChild(window.plugin.planar.getPortalLink(link.start));
     cell.className = "portalTitle";
 
     cell = row.insertCell(-1);
@@ -607,7 +607,12 @@ window.plugin.planar.linksTable = function() {
       .addClass("revlink")
       .data("idx", link.num);
     cell = row.insertCell(-1);
-    cell.appendChild(getPortalLink(link.end));
+    cell.appendChild(window.plugin.planar.getPortalLink(link.end));
+    cell.className = "portalTitle";
+    cell = row.insertCell(-1);
+    window.plugin.planar.checkField(link,true).forEach( function(elem,idx){
+      cell.appendChild(elem);
+    });
     cell.className = "portalTitle";
   });
   return container;
@@ -698,22 +703,12 @@ window.plugin.planar.displayPL = function() {
       dialogClass: 'ui-dialog-planar',
       title: 'Links list: ' + window.plugin.planar.listL.length + ' ' + (window.plugin.planar.listL.length == 1 ? 'link' : 'links'),
       id: 'planar-list',
-      width: 700,
-      resizable: true,
+      width: 900,
       buttons: {
         "reload": function(e){ $("#planar").empty().append(window.plugin.planar.displayPL());},
-        "Show portal list": function(e){ window.plugin.planar.showListPortals();},
+        "Export portal list": function(e){ window.plugin.planar.showListPortals();},
         "Export DT": function(e){ window.plugin.planar.exportInDT();}
-        /*"options": function(e){/*doing anything
-          if ($("#planar").find('.menu_planar').length === 0){
-            $(this).append('<ul class="menu_planar"><li><a onclick="window.plugin.planar.showListPortals()">Show portal list</a></li><li><a onclick="window.plugin.planar.exportInDT()">Export DT</a></li></ul>');
-            $('.menu_planar',this).css("bottom", "1px");
-            $('.menu_planar',this).show('normal');
-          } else {
-            $('.menu_planar',this).hide('normal');
-            $('.menu_planar').remove();
-          }
-    }*/}
+      }
   });
   }
   window.plugin.planar.eventLoad();
