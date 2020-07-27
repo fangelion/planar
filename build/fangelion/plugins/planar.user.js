@@ -2,11 +2,11 @@
 // @id             iitc-plugin-planar@fangelion
 // @name           IITC plugin: show list of links
 // @category       Info
-// @version        0.2.5.@@DATETIMEVERSION@@
+// @version        0.2.5.322351
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
-// @updateURL      @@UPDATEURL@@
-// @downloadURL    @@DOWNLOADURL@@
-// @description    [@@BUILDNAME@@-@@BUILDDATE@@] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
+// @updateURL      none
+// @downloadURL    none
+// @description    [fangelion-2016-07-26-161625] Display a sortable list of all visible portals with full details about the team, resonators, links, etc.
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
 // @match          https://www.ingress.com/intel*
@@ -19,7 +19,19 @@
 // ==/UserScript==
 //"use strict";
 //jshint ignore:start
-@@PLUGINSTART@@ 
+
+function wrapper(plugin_info) {
+// ensure plugin framework is there, even if iitc is not yet loaded
+if(typeof window.plugin !== 'function') window.plugin = function() {};
+
+//PLUGIN AUTHORS: writing a plugin outside of the IITC build environment? if so, delete these lines!!
+//(leaving them in place might break the 'About IITC' page or break update checks)
+plugin_info.buildName = 'fangelion';
+plugin_info.dateTimeVersion = '322351';
+plugin_info.pluginId = 'planar';
+//END PLUGIN AUTHORS NOTE
+
+ 
 // jshint ignore:end
 
 // PLUGIN START ////////////////////////////////////////////////////////
@@ -870,12 +882,26 @@ var setup =  function() {
 
   $("<style>")
     .prop("type", "text/css")
-    .html("@@INCLUDESTRING:plugins/portals-list.css@@")
+    .html(".ui-dialog-content{\n  max-width:900px !important;\n}\n\n#planar.mobile {\n  background: transparent;\n  border: 0 none !important;\n  height: 100% !important;\n  width: 100% !important;\n  left: 0 !important;\n  top: 0 !important;\n  position: absolute;\n  overflow: auto;\n}\n\n#planar table {\n  margin-top: 5px;\n  /*border-collapse: collapse;*/\n  empty-cells: show;\n  width: 100%;\n  clear: both;\n  max-height: 90%;\n  \n}\n\n#planar table td, #planar table th {\n  /*background-color: #1b415e;*/\n  background-color: #017f01;\n  border-bottom: 1px solid #0b314e;\n  color: white;\n  padding: 3px;\n  border: 3px solid #060; \n  border-radius: 5px; \n}\n\n#planar table th {\n  text-align: center;\n}\n\n#planar table .alignR {\n  text-align: right;\n}\n\n#planar table.portals td {\n  white-space: nowrap;\n}\n\n#planar table .num {\n  width: 7%;\n  color: #FFCE00;\n}\n\n#planar table .revlink {\n  width: 7%;\n  color: #FFCE00;\n}\n\n#planar table .portalstartend {\n  width: 35%;\n}\n\n#planar table .portalTitle {\n  overflow: hidden;\n  text-overflow: ellipsis;\n  background-color: #017f01;\n}\n\n/*.menu_planar {\n  display:none;\n  cursor:pointer;\n  float:left;\n  width:220px;\n  background-color:#EEEEEE;\n  text-align:left;\n  position:absolute;\n  z-index:9999;\n  border: 3px solid #060;\n  border-radius: 5px;\n}\n*/\n.menu_planar {\n    display: none;\n    z-index: 1000;\n    position: fixed;\n    overflow: hidden;\n    border: 1px solid #CCC;\n    /*white-space: nowrap;*/\n    font-family: sans-serif;\n    background: #eee;\n    color: #333;\n    border-radius: 5px;\n    padding: 0;\n}\n\n/* Each of the items in the list */\n.menu_planar li {\n    padding: 8px 12px;\n    cursor: pointer;\n    list-style-type: none;\n    transition: all .3s ease;\n}\n\n.menu_planar li:hover {\n    background-color: #DEF;\n}\n\n/*#planar .menu_body li {\n  float:left;\n  position:relative;\n  margin:0 1px;\n  z-index:999;\n  width:150px;\n  background:#507EB9;\n}*/\n")
     .appendTo("head");
 
 };
 
 // PLUGIN END //////////////////////////////////////////////////////////
 // jshint ignore:start
-@@PLUGINEND@@
+
+setup.info = plugin_info; //add the script info data to the function as a property
+if(!window.bootPlugins) window.bootPlugins = [];
+window.bootPlugins.push(setup);
+// if IITC has already booted, immediately run the 'setup' function
+if(window.iitcLoaded && typeof setup === 'function') setup();
+} // wrapper end
+// inject code into site context
+var script = document.createElement('script');
+var info = {};
+if (typeof GM_info !== 'undefined' && GM_info && GM_info.script) info.script = { version: GM_info.script.version, name: GM_info.script.name, description: GM_info.script.description };
+script.appendChild(document.createTextNode('('+ wrapper +')('+JSON.stringify(info)+');'));
+(document.body || document.head || document.documentElement).appendChild(script);
+
+
 // jshint ignore:end
